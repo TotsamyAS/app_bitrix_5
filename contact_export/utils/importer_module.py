@@ -93,6 +93,8 @@ class CSVImporter(BaseImporter):
             reader = csv.DictReader(cleaned_lines, delimiter=delimiter)
             # print(f'>> определены заголовки: {reader.fieldnames}')
 
+            possible_abbreviations = ['ООО', 'ОАО', 'ИП', 'ЗАО', 'ПАО', 'НПАО', 'ГУП', 'МУП']
+
             for row_num, row in enumerate(reader, 1):
                 try:
                     # print(f">> сырая строка {row_num}: {dict(row)}")
@@ -107,6 +109,13 @@ class CSVImporter(BaseImporter):
 
                     if self._validate_row(row):
                         normalized_row = self._normalize_row(row)
+                        if normalized_row['COMPANY_NAME'].split(' ')[0] in possible_abbreviations:
+                            company_name_splitted = normalized_row['COMPANY_NAME'].split(' ')
+                            normalized_row['COMPANY_NAME'] = (
+                                    company_name_splitted[0]
+                                    + ' "'
+                                    + ' '.join(company_name_splitted[1:])
+                                    +'"')
                         contacts.append(normalized_row)
                         # print(f">> строка {row_num} прошла валидацию: {normalized_row}")
                     else:

@@ -92,9 +92,39 @@ def import_contacts(request):
                 print(msg+'. Переход на главную страницу...')
                 messages.error(request, msg)
                 return redirect('index_after')
-            result_msg = f'Сформирован список контактов из импортированного файла: {contacts_to_import}'
-            print('>>' + result_msg)
-            return HttpResponse(result_msg, status=200)
+            # получаем структурированный словарь с названиями компаний
+            company_dict = { company['TITLE']: company['ID'] for company in but.call_list_method("crm.company.list", {
+                "select": ["ID", "TITLE"]
+            })}
+            company_title_list = list(company_dict.keys())
+            print(f'Получен список компаний: {company_dict} \n\
+            И список названий компаний: {company_title_list}\n\
+            \n\
+            Из файла получен следующий наобр контактов: {contacts_to_import}')
+
+
+            methods = []
+            for contact_data in contacts_to_import:
+                fields = {
+                    'NAME': contact_data['NAME'],
+                    'LAST_NAME': contact_data['LAST_NAME'],
+                    'PHONE': {'VALUE': contact_data['PHONE'], 'VALUE_TYPE': 'WORK'} if contact_data['PHONE'] else None,
+                    'EMAIL': {'VALUE': contact_data['EMAIL'], 'VALUE_TYPE': 'WORK'} if contact_data['PHONE'] else None,
+                    'COMPANY_ID': company_dict[contact_data['COMPANY_NAME']] if (
+                            contact_data['COMPANY_NAME']
+                            and contact_data['COMPANY_NAME'] in company_title_list
+                    ) else None,
+                }
+                methods.append(('crm.contact.add', {'fields': fields}))
+            results = but.batch_api_call(methods, halt=0)
+            # анализируем результаты
+            success_count = 0
+            for _, result in results.items():
+                if result.get('error') is None:
+                    success_count += 1
+
+            print(f'>> Успешно импортировано контактов: {success_count}/{len(results.items())}')
+            return redirect('index_after')
         except Exception as e:
             return HttpResponse( f'Ошибка при обработке файла: {str(e)}', status=500)
-        return HttpResponse(f'Недопустимый метод {request.method}', status=405)
+    return HttpResponse(f'Недопустимый метод {request.method}', status=405)
