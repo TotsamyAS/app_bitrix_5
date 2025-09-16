@@ -1,29 +1,32 @@
 
 from django.shortcuts import render, redirect
-from django.contrib import messages
-
+from django.urls import reverse
 from contact_export.utils.exorter_module import ExporterFactory
 from contact_export.utils.importer_module import process_imported_file
 from integration_utils.bitrix24.bitrix_user_auth.main_auth import main_auth
 # from integration_utils.bitrix24.functions.batch_api_call import _batch_api_call
 from django.http import JsonResponse, HttpResponse, JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+from .utils.url_with_message_parameters import url_with_message_parameters
+
 
 # --- функция отображения главной страницы ---
-def common_index_view(request):
-
-    # contacts = but.call_api_method('crm.contact.get', {'ID': 3})
-
-    # если запрос GET, просто рендерим страницу
-    return render(request, 'index.html')
 
 @main_auth(on_start=True, set_cookie=True)
 def start_index(request):
-    return common_index_view(request)
+    return render(request, 'index.html')
 
 @main_auth(on_cookies=True)
 def index_after(request):
-    return common_index_view(request)
+    message_type = request.GET.get('message_type')
+    message_content = request.GET.get('message_content')
+
+    context = {}
+    if message_type and message_content:
+        context['message'] = {
+            'type': message_type,
+            'content': message_content
+        }
+    return render(request, 'index.html', context)
 
 # --- экспорт контактов в xcel или csv
 @main_auth(on_cookies=True)
@@ -82,16 +85,18 @@ def import_contacts(request):
         but = request.bitrix_user_token
         try:
             if 'contacts_file' not in request.FILES:
-                messages.error(request, 'файл не был загружен')
-                print('файл  не был загружен, перевод на главную страницу')
-                return redirect('index_after')
+                print()
+                return redirect(url_with_message_parameters(
+                    redirect_url_string='index_after',
+                    status='error',
+                    content='файл  не был загружен, перевод на главную страницу'))
             uploaded_file = request.FILES['contacts_file']
             contacts_to_import = process_imported_file(uploaded_file)
             if not contacts_to_import:
-                msg = f'Не удалось извлечь контактов из файла или файл пуст'
-                print(msg+'. Переход на главную страницу...')
-                messages.error(request, msg)
-                return redirect('index_after')
+                return redirect(url_with_message_parameters(
+                    redirect_url_string='index_after',
+                    status='error',
+                    content='Не удалось извлечь контактов из файла или файл пуст'))
             # получаем структурированный словарь с названиями компаний
             company_dict = { company['TITLE']: company['ID'] for company in but.call_list_method("crm.company.list", {
                 "select": ["ID", "TITLE"]
@@ -108,8 +113,8 @@ def import_contacts(request):
                 fields = {
                     'NAME': contact_data['NAME'],
                     'LAST_NAME': contact_data['LAST_NAME'],
-                    'PHONE': {'VALUE': contact_data['PHONE'], 'VALUE_TYPE': 'WORK'} if contact_data['PHONE'] else None,
-                    'EMAIL': {'VALUE': contact_data['EMAIL'], 'VALUE_TYPE': 'WORK'} if contact_data['PHONE'] else None,
+                    'PHONE': [{'VALUE': contact_data['PHONE'], 'VALUE_TYPE': 'WORK'}] if contact_data['PHONE'] else None,
+                    'EMAIL': [{'VALUE': contact_data['EMAIL'], 'VALUE_TYPE': 'WORK'}] if contact_data['EMAIL'] else None,
                     'COMPANY_ID': company_dict[contact_data['COMPANY_NAME']] if (
                             contact_data['COMPANY_NAME']
                             and contact_data['COMPANY_NAME'] in company_title_list
@@ -123,8 +128,10 @@ def import_contacts(request):
                 if result.get('error') is None:
                     success_count += 1
 
-            print(f'>> Успешно импортировано контактов: {success_count}/{len(results.items())}')
-            return redirect('index_after')
+            return redirect(url_with_message_parameters(
+                    redirect_url_string='index_after',
+                    status='success',
+                    content=f'Успешно импортировано контактов: {success_count}/{len(results.items())}'))
         except Exception as e:
             return HttpResponse( f'Ошибка при обработке файла: {str(e)}', status=500)
     return HttpResponse(f'Недопустимый метод {request.method}', status=405)
