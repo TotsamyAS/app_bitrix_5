@@ -18,11 +18,11 @@ NGROK_URL='56218ef983f3-8301993767665431593.ngrok-free.app'
 APP_SETTINGS = LocalSettingsClass(
     portal_domain='b24-p202z0.bitrix24.ru',
     app_domain='127.0.0.1:8000',
-    app_name='map_with_spots',
+    app_name='contact_export',
     salt='wefiewofioiI(IF(Eufrew8fju8ewfjhwkefjlewfjlJFKjewubhybfwybgybHBGYBGF',
     secret_key='wefewfkji4834gudrj.kjh237tgofhfjekewf.kjewkfjeiwfjeiwjfijewf',
-    application_bitrix_client_id='local.68c43a18280924.87620077',
-    application_bitrix_client_secret='PLAJpnby64pBVfPHbYIvIJ1hu8M6oMGLobZL1MA0px1KgwcNwO',
+    application_bitrix_client_id='local.68c9224e0b2911.51800674',
+    application_bitrix_client_secret='AlUtKJa4cXguzO8K8tMAgxCxzFHZoe2G1oKRyr2sNL4KxdnNGs',
     application_index_path='/',
 )
 

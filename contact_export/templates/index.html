@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Экспорт контактов</title>
+</head>
+<body>
+    <h2>Приложение 5: Экспорт и импорт контактов</h2>
+
+    <form method="post" action="{% url 'export_contacts' %}">
+        {% csrf_token %}
+
+        <h3>Выберите формат экспорта:</h3>
+
+        <label>
+            <input type="radio" name="exporter_format" value="csv" checked>
+            CSV
+        </label>
+        <br>
+
+        <label>
+            <input type="radio" name="exporter_format" value="xlsx">
+            Excel (XLSX)
+        </label>
+        <br><br>
+
+        <button type="submit">Экспортировать</button>
+    </form>
+</body>
+</html>
