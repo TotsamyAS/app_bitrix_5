@@ -25,5 +25,22 @@
 
         <button type="submit">Экспортировать</button>
     </form>
+    <form method="post" action="{% url 'import_contacts' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <h3>Импорт контактов:</h3>
+        <input type="file" name="contacts_file" accept=".csv,.xlsx,.xls" required>
+        <br><br>
+        <button type="submit">Импортировать</button>
+    </form>
+    <!-- сообщения об успехе/ошибке -->
+    {% if messages %}
+    <div style="margin-top: 20px;">
+        {% for message in messages %}
+        <div style="color: {% if message.tags == 'success' %}green{% else %}red{% endif %};">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 </body>
 </html>

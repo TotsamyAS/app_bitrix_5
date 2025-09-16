@@ -1,7 +1,9 @@
 
-from django.shortcuts import render
+from django.shortcuts import render, redirect
+from django.contrib import messages
 
 from contact_export.utils.exorter_module import ExporterFactory
+from contact_export.utils.importer_module import process_imported_file
 from integration_utils.bitrix24.bitrix_user_auth.main_auth import main_auth
 # from integration_utils.bitrix24.functions.batch_api_call import _batch_api_call
 from django.http import JsonResponse, HttpResponse, JsonResponse
@@ -14,6 +16,14 @@ def common_index_view(request):
 
     # если запрос GET, просто рендерим страницу
     return render(request, 'index.html')
+
+@main_auth(on_start=True, set_cookie=True)
+def start_index(request):
+    return common_index_view(request)
+
+@main_auth(on_cookies=True)
+def index_after(request):
+    return common_index_view(request)
 
 # --- экспорт контактов в xcel или csv
 @main_auth(on_cookies=True)
@@ -66,10 +76,25 @@ def export_contacts(request):
     return HttpResponse(f'Ошибка 405: недопустимый метод {request.method}', status=405)
 
 
-@main_auth(on_start=True, set_cookie=True)
-def start_index(request):
-    return common_index_view(request)
-
 @main_auth(on_cookies=True)
-def index_after(request):
-    return common_index_view(request)
+def import_contacts(request):
+    if request.method == 'POST':
+        but = request.bitrix_user_token
+        try:
+            if 'contacts_file' not in request.FILES:
+                messages.error(request, 'файл не был загружен')
+                print('файл  не был загружен, перевод на главную страницу')
+                return redirect('index_after')
+            uploaded_file = request.FILES['contacts_file']
+            contacts_to_import = process_imported_file(uploaded_file)
+            if not contacts_to_import:
+                msg = f'Не удалось извлечь контактов из файла или файл пуст'
+                print(msg+'. Переход на главную страницу...')
+                messages.error(request, msg)
+                return redirect('index_after')
+            result_msg = f'Сформирован список контактов из импортированного файла: {contacts_to_import}'
+            print('>>' + result_msg)
+            return HttpResponse(result_msg, status=200)
+        except Exception as e:
+            return HttpResponse( f'Ошибка при обработке файла: {str(e)}', status=500)
+        return HttpResponse(f'Недопустимый метод {request.method}', status=405)

@@ -22,5 +22,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', contact_views.start_index, name='start_index'),
     path('index/', contact_views.index_after, name='index_after'),
-path('export_contacts/', contact_views.export_contacts, name='export_contacts'),
+    path('export_contacts/', contact_views.export_contacts, name='export_contacts'),
+    path('import_contacts/', contact_views.import_contacts, name='import_contacts'),
 ]

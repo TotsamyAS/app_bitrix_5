@@ -31,7 +31,14 @@ class BaseImporter(ABC):
             'COMPANY_NAME': row.get('компания', '').strip(),
         }
 
-        # очистка от пустых значений
+        # очистка от пробелов
+        for key in normalized:
+            if normalized[key] is not None:
+                normalized[key] = normalized[key].strip()
+            else:
+                normalized[key] = ''
+
+            # очистка от пустых значений
         for key in normalized:
             if normalized[key] == '':
                 normalized[key] = None
@@ -43,24 +50,79 @@ class CSVImporter(BaseImporter):
     def import_file(self, file: UploadedFile) -> List[Dict[str, Any]]:
         contacts = []
         # декодирование файла с правильной кодировкой
-        text_file = TextIOWrapper(file.file, 'utf-16')
+        try:
+            # сброс файла на начало
+            file.file.seek(0)
+            text_content = file.file.read()
 
-        # определяем разделитель
-        sample_chunk = text_file.read(1024)
-        text_file.seek(0)
+            decoded_content = text_content.decode('utf-16')
+            if decoded_content is None:
+                raise ValueError("не удалось декодировать файл с поддерживаемыми кодировками")
+            #убрать BOM если есть
+            if decoded_content.startswith('\ufeff'):
+                decoded_content = decoded_content[1:]
+                # print('>> BOM удалён')
+            lines = decoded_content.splitlines()
+            if not lines:
+                raise ValueError("файл пуст")
+            # print(f">> получено строк: {len(lines)}")
+            # print(f">> первые 2 строки: {lines[:2]}")
 
-        dialect = csv.Sniffer().sniff(sample_chunk)
-        reader = csv.DictReader(sample_chunk, dialect=dialect)
+            cleaned_lines = []
+            for line in lines:
+                # Убираем BOM из каждой строки
+                if '\ufeff' in line:
+                    line = line.replace('\ufeff', '')
+                    line = line.replace('"', '')
 
-        for row_num, row in enumerate(reader, 1):
-            try:
-                if self._validate_row(row):
-                    normalized_row = self._normalize_row(row)
-                    contacts.append(normalized_row)
-            except csv.Error as e:
-                raise ValueError(f'Ошибка при чтении .csv-файла {e}')
-                return []
-        return contacts
+                cleaned_lines.append(line)
+
+            # print(f">> очищенные строки: {cleaned_lines[:2]}")
+
+            # определение разделителя
+            first_line = cleaned_lines[0]
+            possible_delimiters = [',',';','\t']
+            delimiter = ','
+
+            for delimiter_variant in possible_delimiters:
+                if delimiter_variant in first_line:
+                    delimiter = delimiter_variant
+                    break
+            # print(f">> определен разделитель: '{delimiter}'")
+
+            reader = csv.DictReader(cleaned_lines, delimiter=delimiter)
+            # print(f'>> определены заголовки: {reader.fieldnames}')
+
+            for row_num, row in enumerate(reader, 1):
+                try:
+                    # print(f">> сырая строка {row_num}: {dict(row)}")
+
+                    # проверяем, что значения не None
+                    cleaned_row = {}
+                    for key, value in row.items():
+                        if value is None:
+                            cleaned_row[key] = ''
+                        else:
+                            cleaned_row[key] = value
+
+                    if self._validate_row(row):
+                        normalized_row = self._normalize_row(row)
+                        contacts.append(normalized_row)
+                        # print(f">> строка {row_num} прошла валидацию: {normalized_row}")
+                    else:
+                        # print(f">> строка {row_num} не прошла валидацию: {row}")
+                        pass
+                except Exception as e:
+                    print(f">> Ошибка в строке {row_num}: {e}")
+                    continue
+
+            print(f">> успешно обработано контактов: {len(contacts)}")
+            return contacts
+
+        except Exception as e:
+            print(f">> критическая ошибка при обработке CSV: {str(e)}")
+            raise ValueError(f'ошибка при обработке CSV файла: {str(e)}')
+
 
 class XLSXImporter(BaseImporter):
     """импортирует из xlsx файлов"""
@@ -88,6 +150,7 @@ class XLSXImporter(BaseImporter):
                     normalized_row = self._normalize_row(row_data)
                     contacts.append(normalized_row)
             except Exception as e:
+                print(f'Ошибка при импорте из .xslx файла {e}')
                 raise ValueError(f'Ошибка при импорте из .xslx файла {e}')
                 return []
 
@@ -124,6 +187,7 @@ def detect_file_format(filename: str) -> str:
     elif extension in ['xlsx', 'xls']:
         return 'xlsx'
     else:
+        print(f'неподдерживаемый формат файла {extension}')
         raise ValueError(f'неподдерживаемый формат файла {extension}')
 
 
